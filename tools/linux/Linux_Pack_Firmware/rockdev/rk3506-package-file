@@ -9,6 +9,7 @@ boot        Image/boot.img
 rootfs      Image/rootfs.img
 recovery	Image/recovery.img
 oem			Image/oem.img
+amp	Image/amp.img
 userdata    Image/userdata.img
 misc		Image/misc.img
 # 要写入backup分区的文件就是自身（update.img）
