@@ -49,6 +49,9 @@ extern "C" {
 #define BT_UUID_HFP_HF      "0000111E-0000-1000-8000-00805F9B34FB"
 #define BT_UUID_HFP_AG      "0000111F-0000-1000-8000-00805F9B34FB"
 
+//For auth
+#define RKBT_AUTH_CONFIRM	1
+#define RKBT_AUTH_CANCEL	2
 
 typedef struct {
 	char *uuid;

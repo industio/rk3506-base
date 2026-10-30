@@ -837,10 +837,6 @@ static bool bt_init_common(int os)
 	if (os > DEBIAN_OS)
 		return true;
 
-	kill_task("brcm_patchram_plus1");
-	kill_task("rtk_hciattach");
-	kill_task("rk_hciattach");
-
 	do {
 		if (access("/sys/class/bluetooth/hci0", F_OK) != 0)
 			break;
@@ -854,10 +850,10 @@ static bool bt_init_common(int os)
 
 	/* Bluetooth Controller Init: firmware download and to create hci0 */
 	if (os == BUILDROOT_OS) {
-		if (!access("/usr/bin/wifibt-init.sh", F_OK))
-			exec_command_system("/usr/bin/wifibt-init.sh");
-		else if (!access("/usr/bin/bt_init.sh", F_OK))
-			exec_command_system("/usr/bin/bt_init.sh");
+		if (!access("/usr/bin/rkwifibt.sh", F_OK))
+			exec_command_system("/usr/bin/rkwifibt.sh");
+		else if (!access("/usr/bin/rkwifibt.sh", F_OK))
+			exec_command_system("/usr/bin/rkwifibt.sh");
 	} 
 
 	//if (os == DEBIAN_OS) {
@@ -893,11 +889,8 @@ static bool bt_start_bluetoothd(int os, bool debug_mode)
 		goto bluetoothd;
 	}
 
-	kill_task("bluetoothd");
-	kill_task("obexd");
-
 	if (debug_mode) {
-		exec_command_system("btmon -w /data/btsnoop.log > /dev/null &");
+		//exec_command_system("btmon -w /data/btsnoop.log > /dev/null &");
 		exec_command_system("/usr/libexec/bluetooth/bluetoothd -n -P \
 			battery,hostname,gap,wiimote \
 			-f /data/main.conf \
@@ -988,7 +981,7 @@ bool bt_test_vendor_cb(bool enable)
 	 * bluetoothd -d ==> /var/log/messages
 	 * btmon -w /data/btsnoop.log
 	 */
-	bool debug_mode = true;
+	bool debug_mode = false;
 
 	/* SDK Supported OS: buildroot | Debian */
 	int bt_os = BUILDROOT_OS;
@@ -1009,6 +1002,14 @@ bool bt_test_vendor_cb(bool enable)
 			 */
 			bt_init_third_vendor();
 		} else {
+
+			kill_task("brcm_patchram_plus1");
+			kill_task("rtk_hciattach");
+			kill_task("rk_hciattach");
+			kill_task("bluetoothd");
+			kill_task("obexd");
+			kill_task("hcidump");
+
 			/* 最新SDK集成了初始化脚本，自动初始化蓝牙, 目前仅支持Realtek/Broadcom/Rockchip
 			 * 如下两种场景:
 			 *  1. 如果旧的SDK没有上述内置的初始化脚本，则可以手动添加初始化流程，只针对broadcom/rtk的模块
@@ -1025,6 +1026,9 @@ bool bt_test_vendor_cb(bool enable)
 	} else {
 		bt_deinit_vendor();
 	}
+
+	if (debug_mode)
+		exec_command_system("hcidump -w /data/btsnoop.log &");
 
 	return true;
 }
@@ -1343,6 +1347,10 @@ int create_bt_conf(struct bt_conf *conf)
 		fputs(cmdline, fp);
 	}
 
+	sprintf(cmdline, "Privacy = on\n");
+	fputs(cmdline, fp);
+	fputs("\n", fp);
+
 	//fputs("Experimental = true\n", fp);
 	fputs("[GATT]\n", fp);
 
@@ -1359,10 +1367,6 @@ int create_bt_conf(struct bt_conf *conf)
 		fputs(cmdline, fp);
 	}
 
-	sprintf(cmdline, "Privacy = on\n");
-	fputs(cmdline, fp);
-
-	fputs("\n", fp);
 	fclose(fp);
 
 	system("cat /data/main.conf");
@@ -1405,25 +1409,30 @@ int bt_test_init(void *arg)
 	memset(bt_content.ble_content.ble_name, 0, sizeof(bt_content.ble_content.ble_name));
 	strcpy(bt_content.ble_content.ble_name, "rkble");
 
-	//1234
-	fp = fopen("/data/bt_id.txt", "r");
+	// 1234
+	char bt_id[6] = {0};
+	fp = fopen("/data/bt_id.txt", "r+");
 	if (fp) {
-		char bt_id[6];
-		fscanf(fp, "%s", bt_id); // Read the MAC address
+		fread(bt_id, 1, 6, fp);
 		fclose(fp);
-
-		char buf[38];
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf), "%s_%s", bt_content.bt_name, bt_id);
-		memcpy(bt_content.bt_name, buf, sizeof(bt_content.bt_name));
-
-		memset(buf, 0, sizeof(buf));
-		snprintf(buf, sizeof(buf), "%s_%s", bt_content.ble_content.ble_name, bt_id);
-		memcpy(bt_content.ble_content.ble_name, buf, sizeof(bt_content.ble_content.ble_name));
+	} else {
+		for (int i = 0; i < 6; i++) {
+			bt_id[i] = '0' + (rand() % 10);
+		}
+		fp = fopen("/data/bt_id.txt", "w");
+		fwrite(bt_id, 1, 6, fp);
+		fclose(fp);
 	}
 
+	char buf[38];
+	snprintf(buf, sizeof(buf), "%s_%s", bt_content.bt_name, bt_id);
+	memcpy(bt_content.bt_name, buf, sizeof(bt_content.bt_name));
+
+	snprintf(buf, sizeof(buf), "%s_%s", bt_content.ble_content.ble_name, bt_id);
+	memcpy(bt_content.ble_content.ble_name, buf, sizeof(bt_content.ble_content.ble_name));
+
 	//IO CAPABILITY
-	bt_content.io_capability = IO_CAPABILITY_DISPLAYYESNO;
+	bt_content.io_capability = IO_CAPABILITY_DISPLAYYESNO; //IO_CAPABILITY_NOINPUTNOOUTPUT;
 
 	//OBEX: OPP(File transfer)/PBAP/MAP
 	bt_content.profile |= PROFILE_OBEX;
