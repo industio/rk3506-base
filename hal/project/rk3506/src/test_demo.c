@@ -90,7 +90,7 @@ static void gpio1_isr(uint32_t irq, void *args)
     HAL_GPIO_IRQHandler(GPIO1, GPIO_BANK1);
 }
 
-static HAL_Status b7_call_back(eGPIO_bankId bank, uint32_t pin, void *args)
+static HAL_Status d1_call_back(eGPIO_bankId bank, uint32_t pin, void *args)
 {
     printf("GPIO1B7 callback!\n");
 
@@ -130,13 +130,21 @@ static void gpio_test(void)
     level = HAL_GPIO_GetPinLevel(GPIO1, GPIO_PIN_B7);
     printf("test_gpio 1b7 output low level = %" PRId32 "\n", level);
     HAL_DelayMs(3000);
-
+	
+	/* Test GPIO Input */
+	HAL_GPIO_SetPinDirection(GPIO1, GPIO_PIN_B7, GPIO_IN);
+	HAL_PINCTRL_SetParam(GPIO_BANK1,GPIO_PIN_B7,PIN_CONFIG_PUL_UP);
+	level = HAL_GPIO_GetPinLevel(GPIO1, GPIO_PIN_B7);
+    printf("test_gpio 1b7 input level = %" PRId32 "\n", level);
+	HAL_DelayMs(3000);
+	
     /* Test GPIO interrupt */
     HAL_GPIO_SetPinDirection(GPIO1, GPIO_PIN_B7, GPIO_IN);
+	HAL_PINCTRL_SetParam(GPIO_BANK1,GPIO_PIN_B7,PIN_CONFIG_PUL_UP);
     HAL_IRQ_HANDLER_SetIRQHandler(GPIO1_IRQn, gpio1_isr, NULL);
-    HAL_IRQ_HANDLER_SetGpioIRQHandler(GPIO_BANK1, GPIO_PIN_B7, b7_call_back, NULL);
+    HAL_IRQ_HANDLER_SetGpioIRQHandler(GPIO_BANK1, GPIO_PIN_B7, d1_call_back, NULL);
     HAL_GIC_Enable(GPIO1_IRQn);
-    HAL_GPIO_SetIntType(GPIO1, GPIO_PIN_B7, GPIO_INT_TYPE_EDGE_RISING);
+    HAL_GPIO_SetIntType(GPIO1, GPIO_PIN_B7, GPIO_INT_TYPE_EDGE_FALLING);
     HAL_GPIO_EnableIRQ(GPIO1, GPIO_PIN_B7);
     printf("test_gpio interrupt ready\n");
 }
@@ -155,7 +163,7 @@ static void gpio0_exp_isr(uint32_t irq, void *args)
 
 static HAL_Status b7_call_back(eGPIO_bankId bank, uint32_t pin, void *args)
 {
-    printf("GPIO0B7 exp callback!\n");
+    printf("GPIO1D1 exp callback!\n");
 
     return HAL_OK;
 }
@@ -263,9 +271,9 @@ static void perf_test(void)
 static struct PWM_HANDLE hal_pwm1_handle;
 struct HAL_PWM_CONFIG hal_channel0_config = {
     .channel = 0,
-    .periodNS = 100000,
-    .dutyNS = 40000,
-    .polarity = true,
+    .periodNS = 1000000, //$)AF5BJ#:1KHz
+    .dutyNS = 500000,    //$)AU<?U1H#:50%
+    .polarity = false,
 };
 
 struct HAL_PWM_CONFIG hal_channel1_config = {
@@ -282,11 +290,14 @@ struct HAL_PWM_CONFIG hal_channel2_config = {
     .polarity = false,
 };
 
-static void HAL_IOMUX_PWM0_Config(void)
+static void HAL_IOMUX_PWM1_Config(void)
 {
-    HAL_PINCTRL_SetRMIO(GPIO_BANK0, GPIO_PIN_B0, RMIO_PWM1_CH0);
-    HAL_PINCTRL_SetRMIO(GPIO_BANK0, GPIO_PIN_B1, RMIO_PWM1_CH1);
-    HAL_PINCTRL_SetRMIO(GPIO_BANK0, GPIO_PIN_B2, RMIO_PWM1_CH2);
+    //HAL_PINCTRL_SetRMIO(GPIO_BANK0, GPIO_PIN_B0, RMIO_PWM1_CH0);
+    //HAL_PINCTRL_SetRMIO(GPIO_BANK0, GPIO_PIN_B1, RMIO_PWM1_CH1);
+    //HAL_PINCTRL_SetRMIO(GPIO_BANK0, GPIO_PIN_B2, RMIO_PWM1_CH2);
+	
+	HAL_PINCTRL_SetRMIO(GPIO_BANK1, GPIO_PIN_C2, RMIO_PWM1_CH0);
+    HAL_PINCTRL_SetRMIO(GPIO_BANK1, GPIO_PIN_C3, RMIO_PWM1_CH1);
 }
 
 static void pwm_isr(uint32_t irq, void *args)
@@ -309,34 +320,38 @@ static void pwm_test(void)
     uint8_t channel_mask;
 
     printf("pwm_test: test start:\n");
+	
+    uint32_t hal_pwm1_clk = HAL_CRU_ClkGetFreq(g_pwm1Dev.clkID);
 
-    uint32_t hal_pwm0_clk = HAL_CRU_ClkGetFreq(g_pwm1Dev.clkID);
+    HAL_PWM_Init(&hal_pwm1_handle, g_pwm1Dev.pReg, hal_pwm1_clk);
 
-    HAL_PWM_Init(&hal_pwm1_handle, g_pwm1Dev.pReg, hal_pwm0_clk);
-
-    HAL_IOMUX_PWM0_Config();
+    HAL_IOMUX_PWM1_Config();
 
     HAL_PWM_SetConfig(&hal_pwm1_handle, hal_channel0_config.channel, &hal_channel0_config);
     HAL_PWM_SetConfig(&hal_pwm1_handle, hal_channel1_config.channel, &hal_channel1_config);
-    HAL_PWM_SetConfig(&hal_pwm1_handle, hal_channel2_config.channel, &hal_channel2_config);
+    //HAL_PWM_SetConfig(&hal_pwm1_handle, hal_channel2_config.channel, &hal_channel2_config);
 
     HAL_PWM_SetOutputOffset(&hal_pwm1_handle, hal_channel0_config.channel, 20000);
     HAL_PWM_SetOutputOffset(&hal_pwm1_handle, hal_channel1_config.channel, 30000);
-    HAL_PWM_SetOutputOffset(&hal_pwm1_handle, hal_channel2_config.channel, 40000);
+    //HAL_PWM_SetOutputOffset(&hal_pwm1_handle, hal_channel2_config.channel, 40000);
 
     HAL_PWM_Enable(&hal_pwm1_handle, hal_channel0_config.channel, HAL_PWM_CONTINUOUS);
-    HAL_PWM_Enable(&hal_pwm1_handle, hal_channel1_config.channel, HAL_PWM_CONTINUOUS);
-    HAL_PWM_Enable(&hal_pwm1_handle, hal_channel2_config.channel, HAL_PWM_CAPTURE);
+    //HAL_PWM_Enable(&hal_pwm1_handle, hal_channel1_config.channel, HAL_PWM_CONTINUOUS);
+    //HAL_PWM_Enable(&hal_pwm1_handle, hal_channel2_config.channel, HAL_PWM_CAPTURE);
+    HAL_PWM_Enable(&hal_pwm1_handle, hal_channel1_config.channel, HAL_PWM_CAPTURE);
 
     printf("pwm_test: 1s counter\n", __func__);
-    HAL_PWM_EnableCounter(&hal_pwm1_handle, hal_channel2_config.channel);
+    //HAL_PWM_EnableCounter(&hal_pwm1_handle, hal_channel2_config.channel);
+    HAL_PWM_EnableCounter(&hal_pwm1_handle, hal_channel1_config.channel);
 
-    HAL_DelayMs(1000);
+    HAL_DelayMs(500);
 
-    HAL_PWM_GetCounterRes(&hal_pwm1_handle, hal_channel2_config.channel, &result);
-    printf("pwm test: pwm counter res = 0x%08" PRIx32 "\n", result);
+    //HAL_PWM_GetCounterRes(&hal_pwm1_handle, hal_channel2_config.channel, &result);
+    HAL_PWM_GetCounterRes(&hal_pwm1_handle, hal_channel1_config.channel, &result);
+    printf("pwm test: pwm counter res = %lld\n", result);
 
-    HAL_PWM_DisableCounter(&hal_pwm1_handle, hal_channel2_config.channel);
+    //HAL_PWM_DisableCounter(&hal_pwm1_handle, hal_channel2_config.channel);
+    HAL_PWM_DisableCounter(&hal_pwm1_handle, hal_channel1_config.channel);
 }
 #endif
 
@@ -408,7 +423,7 @@ static int32_t remote_ept_cb(void *payload, uint32_t payload_len, uint32_t src, 
     block->len = payload_len;
     memcpy(block->buffer, payload, payload_len);
     info->cb_sta = 1;
-    //printf("rpmsg remote: msg: %s\n", block->buffer);
+    printf("rpmsg remote: msg: %s\n", block->buffer);
     ret = rpmsg_lite_send(info->instance, info->ept, info->m_ept_id, RPMSG_HAL_TEST_MSG, strlen(RPMSG_HAL_TEST_MSG), RL_BLOCK);
 
     if (ret) {

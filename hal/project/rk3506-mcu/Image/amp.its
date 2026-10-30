@@ -16,8 +16,8 @@
 			type         = "standalone";	// must be "standalone"
 			compression  = "none";
 			arch         = "arm";		// "arm64" or "arm", the same as U-Boot state
-			load         = <0xfff84000>;
-			udelay       = <1000000>;
+			load         = <0x03e00000>;//0xfff84000
+			udelay       = <10000>;
 			hash {
 				algo = "sha256";
 			};

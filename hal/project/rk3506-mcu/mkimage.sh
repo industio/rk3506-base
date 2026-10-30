@@ -15,7 +15,7 @@ CUR_DIR=$(pwd)
 HAL_DIR=$(pwd)/../..
 IMAGE=$(pwd)/Image
 
-cp -r $CUR_DIR/GCC/TestDemo.bin $IMAGE/mcu.bin
+cp -rf $CUR_DIR/GCC/TestDemo.bin $IMAGE/mcu.bin
 $HAL_DIR/tools/mkimage -f $IMAGE/amp.its -E -p 0xe00 $IMAGE/amp.img
 
 echo 'Image: amp.img is ready.'

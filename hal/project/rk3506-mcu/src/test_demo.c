@@ -10,6 +10,7 @@
 /********************* Private MACRO Definition ******************************/
 //#define GPIO_TEST
 //#define GPIO_VIRTUAL_MODEL_TEST
+//#define PWM_TEST
 //#define RPMSG_LINUX_TEST
 //#define SYSTICK_TEST
 //#define TIMER_TEST
@@ -78,6 +79,10 @@ static void gpio_test(void)
     level = HAL_GPIO_GetPinLevel(GPIO1, GPIO_PIN_B7);
     HAL_DBG("test_gpio 1b7 output low level = %d\n", level);
     HAL_DelayMs(3000);
+	
+	HAL_PINCTRL_SetParam(GPIO_BANK1,
+                         GPIO_PIN_B7,
+                         PIN_CONFIG_PUL_UP);
 
     /* Test GPIO interrupt */
     HAL_GPIO_SetPinDirection(GPIO1, GPIO_PIN_B7, GPIO_IN);
@@ -160,6 +165,99 @@ static void gpio_virtual_model_test(void)
 
 /************************************************/
 /*                                              */
+/*                  PWM_TEST                    */
+/*                                              */
+/************************************************/
+#ifdef PWM_TEST
+static struct PWM_HANDLE hal_pwm1_handle;
+struct HAL_PWM_CONFIG hal_channel0_config = {
+    .channel = 0,
+    .periodNS = 1000000, //频率：1KHz
+    .dutyNS = 500000,    //占空比：50%
+    .polarity = false,
+};
+
+struct HAL_PWM_CONFIG hal_channel1_config = {
+    .channel = 1,
+    .periodNS = 100000,
+    .dutyNS = 20000,
+    .polarity = false,
+};
+
+struct HAL_PWM_CONFIG hal_channel2_config = {
+    .channel = 2,
+    .periodNS = 100000,
+    .dutyNS = 50000,
+    .polarity = false,
+};
+
+static void HAL_IOMUX_PWM1_Config(void)
+{
+    //HAL_PINCTRL_SetRMIO(GPIO_BANK0, GPIO_PIN_B0, RMIO_PWM1_CH0);
+    //HAL_PINCTRL_SetRMIO(GPIO_BANK0, GPIO_PIN_B1, RMIO_PWM1_CH1);
+    //HAL_PINCTRL_SetRMIO(GPIO_BANK0, GPIO_PIN_B2, RMIO_PWM1_CH2);
+	
+	HAL_PINCTRL_SetRMIO(GPIO_BANK1, GPIO_PIN_C2, RMIO_PWM1_CH0);
+    HAL_PINCTRL_SetRMIO(GPIO_BANK1, GPIO_PIN_C3, RMIO_PWM1_CH1);
+}
+
+static void pwm_isr(uint32_t irq, void *args)
+{
+    struct PWM_HANDLE *pPWM = (struct PWM_HANDLE *)args;
+    uint32_t i;
+
+    for (i = 0; i < pPWM->channelNum; i++) {
+        HAL_PWM_ChannelIRQHandler(pPWM, i);
+        if (pPWM->pChHandle[i].mode == HAL_PWM_CAPTURE) {
+            HAL_DBG("chanel%d pos cycles = %ld and neg cycles = %ld\n", i,
+                   pPWM->pChHandle[i].result.posCycles, pPWM->pChHandle[i].result.negCycles);
+        }
+    }
+}
+
+static void pwm_test(void)
+{
+    uint64_t result=0;
+    uint8_t channel_mask;
+
+    HAL_DBG("pwm_test: test start:\n");
+	
+    uint32_t hal_pwm1_clk = HAL_CRU_ClkGetFreq(g_pwm1Dev.clkID);
+
+    HAL_PWM_Init(&hal_pwm1_handle, g_pwm1Dev.pReg, hal_pwm1_clk);
+
+    HAL_IOMUX_PWM1_Config();
+
+    HAL_PWM_SetConfig(&hal_pwm1_handle, hal_channel0_config.channel, &hal_channel0_config);
+    HAL_PWM_SetConfig(&hal_pwm1_handle, hal_channel1_config.channel, &hal_channel1_config);
+    //HAL_PWM_SetConfig(&hal_pwm1_handle, hal_channel2_config.channel, &hal_channel2_config);
+
+    HAL_PWM_SetOutputOffset(&hal_pwm1_handle, hal_channel0_config.channel, 20000);
+    HAL_PWM_SetOutputOffset(&hal_pwm1_handle, hal_channel1_config.channel, 30000);
+    //HAL_PWM_SetOutputOffset(&hal_pwm1_handle, hal_channel2_config.channel, 40000);
+
+    HAL_PWM_Enable(&hal_pwm1_handle, hal_channel0_config.channel, HAL_PWM_CONTINUOUS);
+    //HAL_PWM_Enable(&hal_pwm1_handle, hal_channel1_config.channel, HAL_PWM_CONTINUOUS);
+    //HAL_PWM_Enable(&hal_pwm1_handle, hal_channel2_config.channel, HAL_PWM_CAPTURE);
+    HAL_PWM_Enable(&hal_pwm1_handle, hal_channel1_config.channel, HAL_PWM_CAPTURE);
+
+    HAL_DBG("pwm_test: 1s counter\n", __func__);
+    //HAL_PWM_EnableCounter(&hal_pwm1_handle, hal_channel2_config.channel);
+    HAL_PWM_EnableCounter(&hal_pwm1_handle, hal_channel1_config.channel);
+
+    HAL_DelayMs(500);
+
+    //HAL_PWM_GetCounterRes(&hal_pwm1_handle, hal_channel2_config.channel, &result);
+    HAL_PWM_GetCounterRes(&hal_pwm1_handle, hal_channel1_config.channel, &result);
+	HAL_DBG("pwm test: pwm counter res = %lld\n", result);
+	
+    //HAL_PWM_DisableCounter(&hal_pwm1_handle, hal_channel2_config.channel);
+    HAL_PWM_DisableCounter(&hal_pwm1_handle, hal_channel1_config.channel);
+}
+#endif
+
+/************************************************/
+/*                                              */
 /*              RPMSG_LINUX_TEST                */
 /*                                              */
 /************************************************/
@@ -229,7 +327,8 @@ static int32_t remote_ept_cb(void *payload, uint32_t payload_len, uint32_t src, 
     block->len = payload_len;
     memcpy(block->buffer, payload, payload_len);
     info->cb_sta = 1;
-    //HAL_DBG("rpmsg remote: msg: %s\n", block->buffer);
+    HAL_DBG("rpmsg remote rx msg: %s\n", block->buffer);
+	
     ret = rpmsg_lite_send(info->instance, info->ept, info->m_ept_id, RPMSG_HAL_TEST_MSG, strlen(RPMSG_HAL_TEST_MSG), RL_BLOCK);
 
     if (ret) {
@@ -251,7 +350,7 @@ static void rpmsg_linux_test(void)
     master_id = MASTER_ID;
     remote_id = REMOTE_ID;
     HAL_DBG("rpmsg remote: remote core cpu_id-%" PRId32 "\n", remote_id);
-//    HAL_DBG("rpmsg remote: shmem_base-0x%" PRIx32 " shmem_end-%" PRIx32 "\n", RPMSG_LINUX_MEM_BASE, RPMSG_LINUX_MEM_END);
+    HAL_DBG("rpmsg remote: shmem_base-0x%" PRIx32 " shmem_end-%" PRIx32 "\n", RPMSG_LINUX_MEM_BASE, RPMSG_LINUX_MEM_END);
 
     info = malloc(sizeof(struct rpmsg_info_t));
     if (info == NULL) {
@@ -267,8 +366,13 @@ static void rpmsg_linux_test(void)
             ;
         }
     }
-
+	
+	block = (struct rpmsg_block_t *)info->private;
+	memset(block->buffer,0,RL_BUFFER_PAYLOAD_SIZE);
+	
+	//HAL_DBG("rpmsg remote: rpmsg_lite_remote_init\n");
     info->instance = rpmsg_lite_remote_init((void *)RPMSG_LINUX_MEM_BASE, RL_PLATFORM_SET_LINK_ID(master_id, remote_id), RL_NO_FLAGS);
+	HAL_DBG("rpmsg remote wait...\n");
     rpmsg_lite_wait_for_link_up(info->instance);
     HAL_DBG("rpmsg remote: link up! link_id-0x%" PRIx32 "\n", info->instance->link_id);
     rpmsg_ns_bind(info->instance, rpmsg_ns_cb, &ns_cb_data);
@@ -279,6 +383,7 @@ static void rpmsg_linux_test(void)
         HAL_DelayMs(1);
     }
     rpmsg_lite_send(info->instance, info->ept, info->m_ept_id, RPMSG_HAL_TEST_MSG, sizeof(RPMSG_HAL_TEST_MSG), RL_BLOCK);
+	//HAL_DBG("rpmsg_lite_send\n");
 }
 #endif
 
@@ -454,6 +559,10 @@ void test_demo(void)
 
 #ifdef GPIO_VIRTUAL_MODEL_TEST
     gpio_virtual_model_test();
+#endif
+
+#ifdef PWM_TEST
+    pwm_test();
 #endif
 
 #ifdef RPMSG_LINUX_TEST

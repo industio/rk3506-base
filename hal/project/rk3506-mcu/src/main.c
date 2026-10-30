@@ -7,7 +7,7 @@
 #include "hal_base.h"
 
 /********************* Private MACRO Definition ******************************/
-//#define TEST_DEMO
+#define TEST_DEMO
 
 /********************* Private Structure Definition **************************/
 
@@ -78,10 +78,12 @@ int main(void)
 
     /* UART Init */
     HAL_PINCTRL_SetRMIO(GPIO_BANK1,
-                        GPIO_PIN_C2,
+                        //GPIO_PIN_C2,
+                        GPIO_PIN_D3,
                         RMIO_UART4_TX);
     HAL_PINCTRL_SetRMIO(GPIO_BANK1,
-                        GPIO_PIN_C3,
+                        //GPIO_PIN_C3,
+                        GPIO_PIN_D2,
                         RMIO_UART4_RX);
     HAL_UART_Init(&g_uart4Dev, &hal_uart_config);
 
