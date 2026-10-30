@@ -225,6 +225,14 @@ build_debian()
 	finish_build build_debian $@
 }
 
+build_ubuntu()
+{
+	cd rootfs/ubuntu22.04
+	ln -rsf "$PWD/rootfs.img" "$IMAGE_DIR/rootfs.ext4"
+	cd -
+	finish_build build_ubuntu $@
+}
+
 # Hooks
 
 usage_hook()
@@ -239,6 +247,7 @@ usage_hook()
 	usage_oneline "buildroot" "build buildroot rootfs"
 	usage_oneline "yocto" "build yocto rootfs"
 	usage_oneline "debian" "build debian rootfs"
+	usage_oneline "ubuntu" "build ubuntu rootfs"
 }
 
 clean_hook()
@@ -257,7 +266,7 @@ clean_hook()
 	rm -rf "$RK_FIRMWARE_DIR/rootfs.img"
 }
 
-INIT_CMDS="default buildroot debian yocto"
+INIT_CMDS="default buildroot debian yocto ubuntu"
 init_hook()
 {
 	load_config RK_ROOTFS
@@ -321,7 +330,7 @@ pre_build_hook()
 	esac
 }
 
-BUILD_CMDS="rootfs buildroot debian yocto"
+BUILD_CMDS="rootfs buildroot debian yocto ubuntu"
 build_hook()
 {
 	check_config RK_ROOTFS || false
@@ -341,7 +350,7 @@ build_hook()
 	message "=========================================="
 
 	case "$ROOTFS" in
-		yocto | debian | buildroot) ;;
+		yocto | debian | buildroot | ubuntu) ;;
 		*) usage ;;
 	esac
 
@@ -354,6 +363,7 @@ build_hook()
 		yocto) build_yocto "$IMAGE_DIR" ;;
 		debian) build_debian "$IMAGE_DIR" ;;
 		buildroot) build_buildroot "$IMAGE_DIR" ;;
+		ubuntu) build_ubuntu "$IMAGE_DIR" ;;
 	esac
 	touch "$ROOTFS_DIR/.stamp_build_finish"
 
@@ -407,6 +417,6 @@ source "${RK_BUILD_HELPER:-$(dirname "$(realpath "$0")")/build-helper}"
 case "${1:-rootfs}" in
 	buildroot-config | bconfig | buildroot-make | bmake) pre_build_hook $@ ;;
 	buildroot-sdk | bsdk) post_build_hook $@ ;;
-	buildroot | debian | yocto) init_hook $@ ;&
+	buildroot | debian | yocto | ubuntu) init_hook $@ ;&
 	*) build_hook $@ ;;
 esac

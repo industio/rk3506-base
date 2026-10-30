@@ -396,4 +396,5 @@ build_wifibt()
 
 message "Building Wifi/BT module and firmwares..."
 cd "$RK_SDK_DIR"
+exit 0
 build_wifibt

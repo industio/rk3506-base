@@ -1,6 +1,7 @@
 #!/bin/bash -e
 
 RK_RTOS_BSP_DIR=$RK_SDK_DIR/rtos/bsp/rockchip
+RK_HAL_BSP_DIR="$RK_RTOS_BSP_DIR/common/hal/project"
 ITS_FILE="$RK_CHIP_DIR/$RK_AMP_FIT_ITS"
 
 RK_SCRIPTS_DIR="${RK_SCRIPTS_DIR:-$(dirname "$(realpath "$0")")}"
@@ -8,6 +9,9 @@ RK_SCRIPTS_DIR="${RK_SCRIPTS_DIR:-$(dirname "$(realpath "$0")")}"
 usage_hook()
 {
 	usage_oneline "amp" "build and pack amp system"
+	usage_oneline "rtos" "build RT-Thread"
+    usage_oneline "hal" "build HAL"
+    usage_oneline "hal_mcu" "build HAL MCU"
 }
 
 amp_get_value()
@@ -219,8 +223,65 @@ build_images()
 	done
 }
 
-BUILD_CMDS="amp"
-build_hook()
+#RTOS
+cmd_rtos() {
+    local target="${RK_AMP_RTT_TARGET:-rk3506-32}"
+
+    message "=========================================="
+    message "  Building CPU 2: rtos --> ${target}"
+    message "=========================================="
+
+    pushd "${RK_RTOS_BSP_DIR}/${target}" >/dev/null
+    ./build.sh 2
+    popd >/dev/null
+
+    [ -f "${RK_RTOS_BSP_DIR}/${target}/Image/amp.img" ] || fatal "RTOS build finished but ${RK_RTOS_BSP_DIR}/${target}/Image/amp.img not found"
+
+    mkdir -p "${RK_FIRMWARE_DIR}"
+    cp -f "${RK_RTOS_BSP_DIR}/${target}/Image/amp.img" "${RK_FIRMWARE_DIR}/amp.img"
+
+    finish_build rtos "$@"
+}
+
+#HAL（AP核）
+cmd_hal() {
+	local target="${RK_AMP_HAL_TARGET:-rk3506-32}"
+	
+    message "=========================================="
+    message "  Building CPU 2: hal --> ${target}"
+    message "=========================================="
+
+    pushd "${RK_HAL_BSP_DIR}/rk3506/GCC" >/dev/null
+    ./build.sh 2
+    popd >/dev/null
+
+    [ -f "${RK_HAL_BSP_DIR}/rk3506/Image/amp.img" ] || fatal "HAL build finished but ${RK_HAL_BSP_DIR}/rk3506/Image/amp.img not found"
+
+    mkdir -p "${RK_FIRMWARE_DIR}"
+    cp -f "${RK_HAL_BSP_DIR}/rk3506/Image/amp.img" "${RK_FIRMWARE_DIR}/amp.img"
+
+    finish_build hal "$@"
+}
+
+#HAL_MCU（MCU核）
+cmd_hal_mcu() {
+    message "=========================================="
+    message "  Building hal mcu --> rk3506-mcu"
+    message "=========================================="
+
+    pushd "${RK_HAL_BSP_DIR}/rk3506-mcu/GCC" >/dev/null
+    ./build.sh
+    popd >/dev/null
+
+    [ -f "${RK_HAL_BSP_DIR}/rk3506-mcu/Image/amp.img" ] || fatal "HAL MCU build finished but ${RK_HAL_BSP_DIR}/rk3506-mcu/Image/amp.img not found"
+
+    mkdir -p "${RK_FIRMWARE_DIR}"
+    cp -f "${RK_HAL_BSP_DIR}/rk3506-mcu/Image/amp.img" "${RK_FIRMWARE_DIR}/amp.img"
+
+    finish_build hal_mcu "$@"
+}
+
+build_amp_default()
 {
 	local i
 
@@ -272,6 +333,33 @@ build_hook()
 	$RK_RTOS_BSP_DIR/tools/mkimage -f amp.its -E -p 0xe00 $RK_FIRMWARE_DIR/amp.img
 
 	finish_build amp $@
+}
+
+BUILD_CMDS="amp rtos hal hal_mcu"
+
+build_hook() {
+    local cmd="${1:-amp}"
+    if [ $# -gt 0 ]; then
+        shift
+    fi
+
+    case "$cmd" in
+        amp|"")
+            build_amp_default "$@"
+            ;;
+        rtos)
+            cmd_rtos "$@"
+            ;;
+        hal)
+            cmd_hal "$@"
+            ;;
+        hal_mcu)
+            cmd_hal_mcu "$@"
+            ;;
+        *)
+            false
+            ;;
+    esac
 }
 
 source "${RK_BUILD_HELPER:-$(dirname "$(realpath "$0")")/build-helper}"

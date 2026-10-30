@@ -2,6 +2,9 @@
 
 build_wifibt()
 {
+	message "==========skip compile wifi/bt============"
+	exit 0
+
 	DEFAULT_ROOTFS_DIR="$RK_OUTDIR/rootfs/target"
 	ROOTFS_DIR="${1:-$DEFAULT_ROOTFS_DIR}"
 	if [ ! -d "$ROOTFS_DIR" ]; then
