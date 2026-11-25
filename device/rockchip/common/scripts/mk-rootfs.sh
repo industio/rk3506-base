@@ -227,8 +227,9 @@ build_debian()
 
 build_ubuntu()
 {
-	cd rootfs/ubuntu22.04
-	ln -rsf "$PWD/rootfs.img" "$IMAGE_DIR/rootfs.ext4"
+	cd ubuntu
+	sudo ./build.sh -b ido-evb3506 -s jammy -f server -ro
+	ln -rsf "$PWD/build/ubuntu-22.04-preinstalled-server-armhf-ido-evb3506.img" "$IMAGE_DIR/rootfs.ext4"
 	cd -
 	finish_build build_ubuntu $@
 }
