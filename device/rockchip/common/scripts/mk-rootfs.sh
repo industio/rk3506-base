@@ -227,10 +227,14 @@ build_debian()
 
 build_ubuntu()
 {
-	cd ubuntu
-	sudo ./build.sh -b ido-evb3506 -s jammy -f server -ro
-	ln -rsf "$PWD/build/ubuntu-22.04-preinstalled-server-armhf-ido-evb3506.img" "$IMAGE_DIR/rootfs.ext4"
-	cd -
+	if [ -e ubuntu/build/ubuntu-22.04-preinstalled-server-armhf-ido-evb3506.img ]; then
+		ln -rsf "$PWD/ubuntu/build/ubuntu-22.04-preinstalled-server-armhf-ido-evb3506.img" "$IMAGE_DIR/rootfs.ext4"
+	else
+		cd ubuntu
+		sudo ./build.sh -b ido-evb3506 -s jammy -f server -ro
+		ln -rsf "$PWD/build/ubuntu-22.04-preinstalled-server-armhf-ido-evb3506.img" "$IMAGE_DIR/rootfs.ext4"
+		cd -
+	fi
 	finish_build build_ubuntu $@
 }
 
